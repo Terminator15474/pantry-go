@@ -1,6 +1,6 @@
 # pantry-go
 ---
-Helper library to interface with the [Pantry](https://github.com/imRohan/pantry) API in [Go](gol.dev).
+Helper library to interface with the [Pantry](https://github.com/imRohan/pantry) API in [Go](https://go.dev).
 
 ## Installation
 You can download this repo with **go get**.
