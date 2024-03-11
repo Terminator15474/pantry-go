@@ -3,6 +3,7 @@ package pantry
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -10,27 +11,27 @@ import (
 
 type Pantry struct {
 	// GetDetails returns the details of the pantry
-	GetDetails func() PantryInfo
+	GetDetails func() (PantryInfo, error)
 
 	// UpdateDetails updates the details of the pantry
-	UpdateDetails func(info UpdatedInfo) PantryInfo
+	UpdateDetails func(info UpdatedInfo) (PantryInfo, error)
 
 	// CreateOrReplaceBasket creates or replaces a basket in the pantry
 	// with the given name and data and returns true if successful
-	CreateOrReplaceBasket func(name string, data any) bool
+	CreateOrReplaceBasket func(name string, data any) (bool, error)
 
 	// UpdateBasketContent updates the content of the basket
 	// with the given name and returns the updated data
-	UpdateBasketContent func(name string, data any) any
+	UpdateBasketContent func(name string, data any) (any, error)
 
 	// GetBasketContent returns the content of the basket
 	// with the given name in the given format
-	GetBasketContent func(name string, format any) any
+	GetBasketContent func(name string, format any) (any, error)
 
 	// DeleteBasket deletes the basket with the given name
 	// and returns true if successful
 	// THIS WILL DELETE ALL THE DATA IN THE BASKET
-	DeleteBasket func(name string) bool
+	DeleteBasket func(name string) (bool, error)
 }
 
 type BasketInfo struct {
@@ -59,139 +60,139 @@ func CreatePantry(apiKey string) Pantry {
 	var client = &http.Client{}
 
 	var pantry = Pantry{
-		GetDetails: func() PantryInfo {
+		GetDetails: func() (PantryInfo, error) {
 			resp, err := http.Get(url)
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 			defer resp.Body.Close()
 
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 
 			var info = PantryInfo{}
 
 			json.Unmarshal(body, &info)
 
-			return info
+			return info, nil
 		},
 
-		UpdateDetails: func(info UpdatedInfo) PantryInfo {
+		UpdateDetails: func(info UpdatedInfo) (PantryInfo, error) {
 			reqBody, err := json.Marshal(info)
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 
 			req, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(reqBody))
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 
 			defer resp.Body.Close()
 
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				panic(err)
+				return PantryInfo{}, err
 			}
 
 			var newInfo = PantryInfo{}
 
 			json.Unmarshal(body, &newInfo)
 
-			return newInfo
+			return newInfo, nil
 		},
 
-		CreateOrReplaceBasket: func(name string, data any) bool {
+		CreateOrReplaceBasket: func(name string, data any) (bool, error) {
 			if reflect.TypeOf(data).Kind() != reflect.Struct {
-				panic("data must be a struct but got " + reflect.TypeOf(data).Kind().String())
+				return false, errors.New("data must be a struct but got " + reflect.TypeOf(data).Kind().String())
 			}
 
 			reqBody, err := json.Marshal(data)
 			if err != nil {
-				panic(err)
+				return false, err
 			}
 
 			resp, err := http.Post(url+"/basket/"+name, "application/json", bytes.NewBuffer(reqBody))
 			if err != nil {
-				panic(err)
+				return false, err
 			}
 
-			return resp.StatusCode == 200
+			return resp.StatusCode == 200, nil
 		},
 
-		UpdateBasketContent: func(name string, data any) any {
+		UpdateBasketContent: func(name string, data any) (any, error) {
 			if reflect.TypeOf(data).Kind() != reflect.Struct {
-				panic("data must be a struct but got " + reflect.TypeOf(data).Kind().String())
+				return nil, errors.New("data must be a struct but got " + reflect.TypeOf(data).Kind().String())
 			}
 
 			reqBody, err := json.Marshal(data)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
 			req, err := http.NewRequest(http.MethodPut, url+"/basket/"+name, bytes.NewBuffer(reqBody))
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
 			req.Header.Set("Content-Type", "application/json")
 
 			resp, err := client.Do(req)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
 			defer resp.Body.Close()
 
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
-			json.Unmarshal(body, &data)
+			err = json.Unmarshal(body, &data)
 
-			return data
+			return data, err
 		},
 
-		GetBasketContent: func(name string, format any) any {
+		GetBasketContent: func(name string, format any) (any, error) {
 			resp, err := http.Get(url + "/basket/" + name)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
 			defer resp.Body.Close()
 
 			body, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 
-			json.Unmarshal(body, &format)
+			err = json.Unmarshal(body, &format)
 
-			return format
+			return format, err
 		},
 
-		DeleteBasket: func(name string) bool {
+		DeleteBasket: func(name string) (bool, error) {
 			req, err := http.NewRequest(http.MethodDelete, url+"/basket/"+name, nil)
 			if err != nil {
-				panic(err)
+				return false, err
 			}
 
 			resp, err := client.Do(req)
 			if err != nil {
-				panic(err)
+				return false, err
 			}
 
-			return resp.StatusCode == 200
+			return resp.StatusCode == 200, nil
 		},
 	}
 
